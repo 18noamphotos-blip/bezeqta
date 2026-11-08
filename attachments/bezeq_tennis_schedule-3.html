@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>לוח משחקים | בזק תא-טניס | ליגה למקומות עבודה הפועל מחוז תל אביב</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --hapoel-red: #c8102e;
+  --hapoel-red-dark: #9a0c23;
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --text-muted: #5a6570;
+  --border: #e2e8f0;
+  --row-alt: #f8fafc;
+  --played: #6c757d;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Heebo', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.header {
+  background: linear-gradient(135deg, var(--hapoel-red) 0%, var(--hapoel-red-dark) 100%);
+  color: white;
+  padding: 28px 20px 32px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(200, 16, 46, 0.25);
+}
+
+.header h1 { font-size: 1.85rem; font-weight: 800; margin-bottom: 6px; }
+.header .subtitle { font-size: 1.05rem; opacity: 0.92; }
+.header .league-info { margin-top: 10px; font-size: 0.92rem; opacity: 0.85; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.card-header {
+  background: #f8f9fa;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-header h2 { font-size: 1.15rem; font-weight: 700; color: var(--hapoel-red); }
+
+.badge {
+  background: var(--hapoel-red);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+
+thead th {
+  background: #f1f3f5;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 12px 10px;
+  text-align: right;
+  border-bottom: 2px solid var(--border);
+}
+
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+tbody tr:hover { background: #fff5f5; }
+
+td { padding: 12px 10px; vertical-align: middle; }
+
+.round-cell { font-weight: 700; color: var(--hapoel-red); text-align: center; min-width: 50px; }
+.date-cell { font-weight: 600; white-space: nowrap; }
+.day-cell { color: var(--text-muted); font-size: 0.88rem; }
+.opponent { font-weight: 600; }
+.location { font-size: 0.85rem; color: var(--text-muted); }
+.time { font-weight: 500; color: var(--hapoel-red); }
+
+.played-row {
+  text-decoration: line-through;
+  color: var(--played);
+  opacity: 0.75;
+}
+.played-row .opponent,
+.played-row .date-cell { text-decoration: line-through; }
+
+.checkbox-cell { text-align: center; }
+.checkbox-cell input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--hapoel-red);
+}
+
+.score-input {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: center;
+  direction: ltr;
+}
+.score-input:focus { outline: none; border-color: var(--hapoel-red); }
+
+.footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.reset-btn {
+  background: transparent;
+  border: 1px solid var(--hapoel-red);
+  color: var(--hapoel-red);
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.reset-btn:hover { background: #fff5f5; }
+
+@media (max-width: 700px) {
+  .header h1 { font-size: 1.45rem; }
+  thead { display: none; }
+  tbody tr { display: block; padding: 12px; border-bottom: 1px solid var(--border); }
+  td { display: block; padding: 4px 0; text-align: right; }
+  .checkbox-cell, .score-cell { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .checkbox-cell::before { content: "שוחק: "; }
+  .score-cell::before { content: "תוצאה: "; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>בזק תא-טניס</h1>
+  <div class="subtitle">לוח משחקים עונת 2026/27</div>
+  <div class="league-info">ליגה למקומות עבודה · הפועל מחוז תל אביב · טניס שדה · בית ערב 2</div>
+</header>
+
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      <h2>לוח המשחקים</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span class="badge">כל המשחקים בשעה 19:00</span>
+        <button class="reset-btn" onclick="resetAll()">אפס הכל</button>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>מחזור</th>
+          <th>תאריך</th>
+          <th>יום</th>
+          <th>יריבה</th>
+          <th>מיקום</th>
+          <th>שעה</th>
+          <th>שוחק</th>
+          <th>תוצאה</th>
+        </tr>
+      </thead>
+      <tbody id="matchesBody">
+        <!-- rows will be filled by JS or statically -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    מקור: אתר הליגה למקומות עבודה הפועל מחוז תל אביב · עונת 2026/27<br>
+    סימונים ותוצאות נשמרים בדפדפן שלך
+  </div>
+</div>
+
+<script>
+const matches = [
+  { id: 1, round: 8, date: "01.12.2026", day: "יום ג'", opponent: "חב' חשמל תא-טניס שדה", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 2, round: 11, date: "24.12.2026", day: "יום ה'", opponent: "בנק לאומי מרכז", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 3, round: 12, date: "12.01.2027", day: "יום ג'", opponent: "כלל ביטוח", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 4, round: 10, date: "28.01.2027", day: "יום ה'", opponent: "משמר-טניס שדה", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 5, round: 3, date: "04.02.2027", day: "יום ה'", opponent: "רשות שדות התעופה - טניס", location: "מועדון טניס הדר יוסף" },
+  { id: 6, round: 9, date: "04.02.2027", day: "יום ה'", opponent: "אל-על טניס שדה", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 7, round: 2, date: "10.02.2027", day: "יום ד'", opponent: "קופ\"ח מאוחדת 1", location: "מועדון טניס הדר יוסף" },
+  { id: 8, round: 13, date: "23.02.2027", day: "יום ג'", opponent: "לאומי MAX טניס", location: "מגרש טניס ביד אליהו, תל אביב" },
+  { id: 9, round: 4, date: "01.04.2027", day: "יום ה'", opponent: "הראל ביטוח ופיננסים", location: "מועדון טניס הדר יוסף" },
+  { id: 10, round: 5, date: "20.04.2027", day: "יום ג'", opponent: "פלאפון א'", location: "מועדון טניס הדר יוסף" },
+  { id: 11, round: 6, date: "09.06.2027", day: "יום ד'", opponent: "מגדל חברה לביטוח", location: "מועדון טניס הדר יוסף" },
+  { id: 12, round: 7, date: "01.07.2027", day: "יום ה'", opponent: "בנק דיסקונט א'", location: "מועדון טניס הדר יוסף" }
+];
+
+const STORAGE_KEY = "bezeq_tennis_2026_27";
+
+function loadState() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function renderTable() {
+  const state = loadState();
+  const tbody = document.getElementById("matchesBody");
+  tbody.innerHTML = "";
+
+  matches.forEach(m => {
+    const played = state[m.id]?.played || false;
+    const score = state[m.id]?.score || "";
+    const tr = document.createElement("tr");
+    if (played) tr.classList.add("played-row");
+
+    tr.innerHTML = `
+      <td class="round-cell">${m.round}</td>
+      <td class="date-cell">${m.date}</td>
+      <td class="day-cell">${m.day}</td>
+      <td class="opponent">${m.opponent}</td>
+      <td class="location">${m.location}</td>
+      <td class="time">19:00</td>
+      <td class="checkbox-cell">
+        <input type="checkbox" data-id="${m.id}" ${played ? "checked" : ""} onchange="togglePlayed(${m.id}, this.checked)">
+      </td>
+      <td class="score-cell">
+        <input type="text" class="score-input" data-id="${m.id}" value="${score}" placeholder="2-1" oninput="updateScore(${m.id}, this.value)">
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function togglePlayed(id, played) {
+  const state = loadState();
+  if (!state[id]) state[id] = {};
+  state[id].played = played;
+  saveState(state);
+  renderTable();
+}
+
+function updateScore(id, score) {
+  const state = loadState();
+  if (!state[id]) state[id] = {};
+  state[id].score = score;
+  saveState(state);
+}
+
+function resetAll() {
+  if (confirm("לאפס את כל הסימונים והתוצאות?")) {
+    localStorage.removeItem(STORAGE_KEY);
+    renderTable();
+  }
+}
+
+renderTable();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "בזק תא-טניס · לוח משחקים",
+      "hasCanvas": false,
+      "bodyTextLen": 1679,
+      "bodyTextHash": "ddd9498c835aedf20f3d08827219b47712a4e4d4de432a5deafa3d165957722b",
+      "bodyTextPrefix": "ליגה למקומות עבודה · הפועל מחוז תל אביב בזק תא-טניס בית ערב 2 לו",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "בזק תא-טניס · לוח משחקים",
+      "hasCanvas": false,
+      "bodyTextLen": 1679,
+      "bodyTextHash": "ddd9498c835aedf20f3d08827219b47712a4e4d4de432a5deafa3d165957722b",
+      "bodyTextPrefix": "ליגה למקומות עבודה · הפועל מחוז תל אביב בזק תא-טניס בית ערב 2 לו",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
