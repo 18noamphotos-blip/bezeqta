@@ -1,24 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CalendarPlus,
   Clock,
   MapPin,
   Navigation,
-  RotateCcw,
   Share2,
   TriangleAlert,
 } from "lucide-react";
 import { KICKOFF, MATCHES, VENUES, type Match, type VenueId } from "@/data/matches";
 import {
   HOME_KEY,
-  STORAGE_KEY,
   dayNum,
   daysUntil,
   downloadIcs,
   dots,
   googleCalendarUrl,
-  loadEntries,
   loadHome,
   longDate,
   mapsUrl,
@@ -33,10 +30,14 @@ import {
   whenLabel,
   type Entries,
 } from "@/lib/tennis";
+import { listMarks, saveMark, type SharedMark } from "@/lib/marks.functions";
+
+import { mergeSharedSnapshot } from "@/lib/shared-marks";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 const CLASHES = sameDayIds();
+const STORAGE_KEY = "bezeq_tennis_shared_v1";
 type Filter = "all" | "open" | "played";
 
 function Home() {
@@ -44,24 +45,106 @@ function Home() {
   const [home, setHome] = useState<VenueId | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [now, setNow] = useState<Date | null>(null);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [syncError, setSyncError] = useState(false);
+  const entriesRef = useRef(entries);
+  const inflight = useRef(new Map<number, number>());
+  const tries = useRef(new Map<number, number>());
+  const seq = useRef(0);
+  const remoteVersion = useRef(-1);
+
+  function remember(next: Entries) {
+    entriesRef.current = next;
+    setEntries(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  }
+
+  function applyRemote(rows: SharedMark[]) {
+    const merged = mergeSharedSnapshot(rows, remoteVersion.current, entriesRef.current, inflight.current.keys());
+    if (!merged) return;
+    remoteVersion.current = merged.version;
+    remember(merged.entries);
+  }
+
+  function push(id: number, entry: { played?: boolean; score?: string }) {
+    const ticket = ++seq.current;
+    inflight.current.set(id, ticket);
+    const payload = {
+      matchId: id,
+      played: Boolean(entry.played),
+      score: (entry.score ?? "").trim().slice(0, 8),
+    };
+    if (!/^[\d\s:–\-]*$/.test(payload.score)) payload.score = "";
+    void saveMark({ data: payload })
+      .then((rows) => {
+        if (inflight.current.get(id) !== ticket) return;
+        const latest = entriesRef.current[id];
+        const same =
+          Boolean(latest?.played) === payload.played &&
+          (latest?.score ?? "").trim().slice(0, 8) === payload.score;
+        inflight.current.delete(id);
+        tries.current.delete(id);
+        if (!same) {
+          inflight.current.set(id, -1);
+          return;
+        }
+        applyRemote(rows);
+        if (inflight.current.size === 0) setSyncError(false);
+      })
+      .catch(() => {
+        if (inflight.current.get(id) !== ticket) return;
+        const attempt = (tries.current.get(id) ?? 0) + 1;
+        tries.current.set(id, attempt);
+        setSyncError(true);
+        if (attempt < 3) {
+          window.setTimeout(() => {
+            if (inflight.current.get(id) !== ticket) return;
+            push(id, entriesRef.current[id] ?? entry);
+          }, 2000);
+        }
+      });
+  }
 
   useEffect(() => {
-    setEntries(loadEntries());
+    let cancelled = false;
+    // Shared board is authoritative. Never read or upload old device scores.
     setHome(loadHome());
     setNow(new Date());
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    const clock = window.setInterval(() => setNow(new Date()), 60_000);
 
-  useEffect(() => {
-    if (!confirmReset) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setConfirmReset(false);
+    async function refresh() {
+      try {
+        const rows = await listMarks();
+        if (cancelled) return;
+        applyRemote(rows);
+        // A successful poll after a prolonged outage retries only current edits.
+        for (const [id, ticket] of inflight.current) {
+          if (ticket > 0 && (tries.current.get(id) ?? 0) >= 3) {
+            tries.current.delete(id);
+            push(id, entriesRef.current[id] ?? {});
+          }
+        }
+        if (inflight.current.size === 0) setSyncError(false);
+      } catch {
+        if (!cancelled) setSyncError(true);
+      }
+    }
+
+    void refresh();
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 6000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [confirmReset]);
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(clock);
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const played = playedCount(entries);
   const record = recordFrom(entries);
@@ -73,26 +156,33 @@ function Home() {
     return true;
   });
 
-  function save(next: Entries) {
-    setEntries(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }
+  const scoreTimers = useRef(new Map<number, number>());
 
-  function patch(id: number, partial: Partial<Entries[string]>) {
-    const current = entries[id] ?? {};
-    save({ ...entries, [id]: { ...current, ...partial } });
+  function patch(id: number, partial: Partial<Entries[string]>, immediate: boolean) {
+    const current = entriesRef.current[id] ?? {};
+    const nextEntry = { ...current, ...partial };
+    remember({ ...entriesRef.current, [id]: nextEntry });
+    if (!inflight.current.has(id)) inflight.current.set(id, -1);
+    const pending = scoreTimers.current.get(id);
+    if (pending) window.clearTimeout(pending);
+    if (immediate) {
+      scoreTimers.current.delete(id);
+      push(id, nextEntry);
+      return;
+    }
+    scoreTimers.current.set(
+      id,
+      window.setTimeout(() => {
+        scoreTimers.current.delete(id);
+        push(id, entriesRef.current[id] ?? nextEntry);
+      }, 350),
+    );
   }
 
   function chooseHome(venue: VenueId | null) {
     setHome(venue);
     if (venue) localStorage.setItem(HOME_KEY, venue);
     else localStorage.removeItem(HOME_KEY);
-  }
-
-  function resetAll() {
-    localStorage.removeItem(STORAGE_KEY);
-    setEntries({});
-    setConfirmReset(false);
   }
 
   const clashOpen = MATCHES.filter(
@@ -189,7 +279,7 @@ function Home() {
               style={{ width: `${(played / MATCHES.length) * 100}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted">מאזן: ניצחונות–תיקו–הפסדים. התוצאה היא אנחנו–יריב, למשל 2-1.</p>
+          <p className="mt-2 text-xs text-muted">מאזן: ניצחונות–תיקו–הפסדים. התוצאה היא אנחנו–יריב, למשל 2-1. הסימון משותף לכל הקבוצה.</p>
         </section>
 
         {clashOpen.length > 1 ? (
@@ -230,12 +320,16 @@ function Home() {
                 score={entries[match.id]?.score ?? ""}
                 home={home}
                 past={now ? daysUntil(match.date, now) < 0 : false}
-                onPlayed={(value) => patch(match.id, { played: value })}
+                onPlayed={(value) => patch(match.id, { played: value }, true)}
                 onScore={(value) =>
-                  patch(match.id, {
-                    score: value,
-                    ...( /^\d+\s*[-:–]\s*\d+$/.test(value.trim()) ? { played: true } : {}),
-                  })
+                  patch(
+                    match.id,
+                    {
+                      score: value,
+                      ...( /^\d+\s*[-:–]\s*\d+$/.test(value.trim()) ? { played: true } : {}),
+                    },
+                    false,
+                  )
                 }
               />
             ))
@@ -258,7 +352,7 @@ function Home() {
           </HomeButton>
         </div>
 
-        <section className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <section className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button
             type="button"
             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-hapoel px-3 text-sm font-semibold text-on-red"
@@ -275,58 +369,16 @@ function Home() {
             <CalendarPlus className="size-4" aria-hidden="true" />
             כל העונה ליומן
           </button>
-          <button
-            type="button"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-hapoel"
-            onClick={() => setConfirmReset(true)}
-          >
-            <RotateCcw className="size-4" aria-hidden="true" />
-            איפוס סימונים
-          </button>
         </section>
 
         <footer className="mt-6 text-center text-xs leading-relaxed text-muted">
-          מחזור 1 הוא פטור, בלי יריבה. הסימונים והתוצאות נשמרים רק במכשיר הזה.
+          {syncError ? "הסימון עדיין לא הגיע לשאר. ננסה שוב." : "מחזור 1 הוא פטור, בלי יריבה."}
+          <br />
+          הסימונים והתוצאות משותפים לכל מי שנכנס לאתר.
           <br />
           מקור: לוח הליגה למקומות עבודה, הפועל מחוז תל אביב · עונת 2026/27.
         </footer>
       </main>
-
-      {confirmReset ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
-          onClick={() => setConfirmReset(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reset-title"
-            className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-sm"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="reset-title" className="text-lg font-extrabold">
-              לאפס את כל הסימונים?
-            </h2>
-            <p className="mt-2 text-sm text-muted">התוצאות והסימונים יימחקו מהמכשיר הזה. הלוח עצמו יישאר.</p>
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                className="h-11 flex-1 rounded-xl bg-hapoel text-sm font-semibold text-on-red"
-                onClick={resetAll}
-              >
-                אפס
-              </button>
-              <button
-                type="button"
-                className="h-11 flex-1 rounded-xl border border-line text-sm font-semibold"
-                onClick={() => setConfirmReset(false)}
-              >
-                ביטול
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -66,5 +66,17 @@ test('Pages entry reuses unchanged UI with RTL shell and no Grok manifest', () =
   assert.ok(readFileSync('pages/styles.css', 'utf8').includes('@source "../src"'));
   assert.ok(html.includes('lang="he" dir="rtl"'));
   assert.ok(!html.includes('/__grok/'));
-  for (const code of ['localStorage.setItem(STORAGE_KEY', 'localStorage.setItem(HOME_KEY', 'localStorage.removeItem(STORAGE_KEY)', 'MATCHES.filter', 'recordFrom(entries)', 'downloadIcs(MATCHES']) assert.ok(ui.includes(code), code);
+  for (const code of ['localStorage.setItem(STORAGE_KEY', 'localStorage.setItem(HOME_KEY', 'MATCHES.filter', 'recordFrom(entries)', 'downloadIcs(MATCHES']) assert.ok(ui.includes(code), code);
+});
+
+
+test('shared clean start never reads old cached scores or auto-uploads them', () => {
+ const ui = readFileSync('src/routes/index.tsx','utf8');
+ assert.ok(!ui.includes('loadEntries'));
+ assert.ok(!ui.includes('allowUpload'));
+ assert.ok(!ui.includes('resetAll'));
+ assert.ok(ui.includes('bezeq_tennis_shared_v1'));
+ assert.ok(ui.includes('mergeSharedSnapshot(rows, remoteVersion.current'));
+ assert.ok(ui.includes('6000'));
+ assert.ok(ui.includes('350'));
 });

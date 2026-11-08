@@ -1,0 +1,9 @@
+{
+ "name": "bezeqta-scores",
+ "main": "index.mjs",
+ "account_id": "75752b4487193f5f8a06969b0de82305",
+ "compatibility_date": "2026-11-08",
+ "workers_dev": true,
+ "observability": { "enabled": true, "head_sampling_rate": 0.1, "traces": { "enabled": true, "head_sampling_rate": 0.1 } },
+ "d1_databases": [{ "binding": "DB", "database_name": "bezeqta-scores", "database_id": "a99dc9c2-2cd3-4abb-9600-76f60de1375f" }]
+}
