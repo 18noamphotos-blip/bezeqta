@@ -33,6 +33,7 @@ import {
 import { listMarks, saveMark, type SharedMark } from "@/lib/marks.functions";
 
 import { mergeSharedSnapshot } from "@/lib/shared-marks";
+import { ALLOWED_SCORES, allowedScore, outcomeFromScore, scoreForOutcome, scoreSelection, type Outcome } from "@/lib/score-selection";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -320,17 +321,11 @@ function Home() {
                 score={entries[match.id]?.score ?? ""}
                 home={home}
                 past={now ? daysUntil(match.date, now) < 0 : false}
-                onPlayed={(value) => patch(match.id, { played: value }, true)}
-                onScore={(value) =>
-                  patch(
-                    match.id,
-                    {
-                      score: value,
-                      ...( /^\d+\s*[-:–]\s*\d+$/.test(value.trim()) ? { played: true } : {}),
-                    },
-                    false,
-                  )
-                }
+                onPlayed={(value) => patch(match.id, value ? { played: true } : { played: false, score: "" }, true)}
+                onScore={(value) => {
+                  const selection = scoreSelection(value);
+                  if (selection) patch(match.id, selection, false);
+                }}
               />
             ))
           )}
@@ -530,8 +525,8 @@ function MatchCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <label className="inline-flex h-11 flex-1 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold">
+      <div className="mt-3 grid grid-cols-3 items-end gap-2">
+        <label className="inline-flex h-11 min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-line px-2 text-sm font-semibold">
           <input
             type="checkbox"
             className="size-5 accent-hapoel"
@@ -541,18 +536,39 @@ function MatchCard({
           />
           שוחק
         </label>
-        <input
-          type="text"
-          inputMode="text"
-          autoComplete="off"
-          dir="ltr"
-          value={score}
-          placeholder="2-1"
-          aria-label={`תוצאה נגד ${match.opponent}, אנחנו מול היריב`}
-          onChange={(event) => onScore(event.target.value)}
-          className="h-11 w-24 rounded-xl border border-line bg-bg text-center text-base font-semibold"
-        />
+        <label className="min-w-0 text-xs font-semibold text-muted">
+          תוצאה
+          <select
+            dir="ltr"
+            value={allowedScore(score) ? score : ""}
+            aria-label={`תוצאה נגד ${match.opponent}, אנחנו מול היריב`}
+            onChange={(event) => onScore(event.target.value)}
+            className="mt-1 h-11 w-full rounded-xl border border-line bg-bg px-2 text-center text-base font-semibold text-ink"
+          >
+            <option value="" aria-label="ללא תוצאה"></option>
+            {ALLOWED_SCORES.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <label className="min-w-0 text-xs font-semibold text-muted">
+          ניצחון / הפסד
+          <select
+            value={outcomeFromScore(score)}
+            aria-label={`ניצחון או הפסד נגד ${match.opponent}`}
+            onChange={(event) => onScore(scoreForOutcome(event.target.value as Outcome, score))}
+            className="mt-1 h-11 w-full rounded-xl border border-line bg-bg px-2 text-sm font-semibold text-ink"
+          >
+            <option value="" aria-label="ללא הכרעה"></option>
+            <option value="win">ניצחון</option>
+            <option value="loss">הפסד</option>
+          </select>
+        </label>
       </div>
+      {!allowedScore(score) ? (
+        <p className="mt-1 text-xs text-muted">תוצאה קודמת: <bdi>{score}</bdi>. נשמרת עד לבחירה חדשה.</p>
+      ) : null}
+      <p className="mt-1 text-xs text-muted">
+        אנחנו–יריב. בחירת ניצחון מתחילה ב־<bdi>2-1</bdi>, הפסד ב־<bdi>0-3</bdi>; אפשר לשנות בתוצאה.
+      </p>
 
       <div className="mt-2 grid grid-cols-3 gap-2">
         <ActionLink href={wazeUrl(match)} label="ווייז" icon={<Navigation className="size-4" />} />
