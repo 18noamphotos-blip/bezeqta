@@ -1,0 +1,4 @@
+@import "../src/styles.css";
+
+/* This build has a separate root; scan the original UI for Tailwind utilities. */
+@source "../src";
