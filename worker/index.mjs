@@ -1,12 +1,9 @@
+import { ORIGIN, validMark } from './validate.mjs';
 // Intentionally public editing, matching the exported application. CORS is NOT auth.
-const ORIGIN = 'https://18noamphotos-blip.github.io';
 const headers = { 'Access-Control-Allow-Origin': ORIGIN, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '86400', 'Cache-Control': 'no-store', 'Vary': 'Origin' };
 const select = 'SELECT match_id, played, score FROM match_marks ORDER BY match_id';
 const revision = 'SELECT version FROM board_revision WHERE id = 1';
 const json = (body, status = 200) => Response.json(body, { status, headers });
-function validMark(data) {
-  return data && Number.isInteger(data.matchId) && data.matchId >= 1 && data.matchId <= 12 && typeof data.played === 'boolean' && typeof data.score === 'string' && data.score.length <= 8 && /^[\d\s:–\-]*$/.test(data.score);
-}
 function snapshot(results) {
   const [rows, version] = results.slice(-2);
   return { version: Number(version.results[0].version), marks: rows.results.map(row => ({ matchId: row.match_id, played: Boolean(row.played), score: row.score })) };

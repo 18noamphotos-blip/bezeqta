@@ -166,6 +166,16 @@ export function buildIcs(matches: Match[]): string {
       `SUMMARY:${icsEscape(eventTitle(match))}`,
       `LOCATION:${icsEscape(venue.full)}`,
       `DESCRIPTION:${icsEscape(eventDetails(match))}`,
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:תזכורת משחק",
+      "TRIGGER:-P1D",
+      "END:VALARM",
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:תזכורת משחק",
+      "TRIGGER:-PT1H",
+      "END:VALARM",
       "END:VEVENT",
     );
   }

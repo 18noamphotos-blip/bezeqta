@@ -15,7 +15,6 @@ import {
   daysUntil,
   downloadIcs,
   dots,
-  googleCalendarUrl,
   loadHome,
   longDate,
   mapsUrl,
@@ -33,6 +32,7 @@ import {
 import { listMarks, saveMark, type SharedMark } from "@/lib/marks.functions";
 
 import { mergeSharedSnapshot } from "@/lib/shared-marks";
+import { buildMarkPayload } from "@/lib/mark-payload";
 import { ALLOWED_SCORES, allowedScore, outcomeFromScore, scoreForOutcome, scoreSelection, type Outcome } from "@/lib/score-selection";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -69,12 +69,7 @@ function Home() {
   function push(id: number, entry: { played?: boolean; score?: string }) {
     const ticket = ++seq.current;
     inflight.current.set(id, ticket);
-    const payload = {
-      matchId: id,
-      played: Boolean(entry.played),
-      score: (entry.score ?? "").trim().slice(0, 8),
-    };
-    if (!/^[\d\s:–\-]*$/.test(payload.score)) payload.score = "";
+    const payload = buildMarkPayload(id, entry);
     void saveMark({ data: payload })
       .then((rows) => {
         if (inflight.current.get(id) !== ticket) return;
@@ -85,7 +80,8 @@ function Home() {
         inflight.current.delete(id);
         tries.current.delete(id);
         if (!same) {
-          inflight.current.set(id, -1);
+          // A newer local edit won the race; queue that instead of stalling on -1.
+          window.setTimeout(() => push(id, entriesRef.current[id] ?? entry), 0);
           return;
         }
         applyRemote(rows);
@@ -257,10 +253,10 @@ function Home() {
                     <div className="mt-3 grid grid-cols-3 gap-2">
                       <ActionLink href={wazeUrl(match)} label="ווייז" icon={<Navigation className="size-4" />} primary />
                       <ActionLink href={mapsUrl(match)} label="מפות" icon={<MapPin className="size-4" />} />
-                      <ActionLink
-                        href={googleCalendarUrl(match)}
+                      <ActionButton
                         label="יומן"
                         icon={<CalendarPlus className="size-4" />}
+                        onClick={() => downloadIcs([match], `bezeq-tennis-match-${match.id}.ics`)}
                       />
                     </div>
                   </li>
@@ -324,7 +320,7 @@ function Home() {
                 onPlayed={(value) => patch(match.id, value ? { played: true } : { played: false, score: "" }, true)}
                 onScore={(value) => {
                   const selection = scoreSelection(value);
-                  if (selection) patch(match.id, selection, false);
+                  if (selection) patch(match.id, selection, true);
                 }}
               />
             ))
@@ -475,6 +471,31 @@ function ActionLink({
   );
 }
 
+function ActionButton({
+  label,
+  icon,
+  onClick,
+  primary = false,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-11 cursor-pointer items-center justify-center gap-1 rounded-xl text-sm font-semibold ${
+        primary ? "bg-hapoel text-on-red" : "border border-line bg-surface text-ink"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
 function MatchCard({
   match,
   played,
@@ -573,7 +594,11 @@ function MatchCard({
       <div className="mt-2 grid grid-cols-3 gap-2">
         <ActionLink href={wazeUrl(match)} label="ווייז" icon={<Navigation className="size-4" />} />
         <ActionLink href={mapsUrl(match)} label="מפות" icon={<MapPin className="size-4" />} />
-        <ActionLink href={googleCalendarUrl(match)} label="יומן" icon={<CalendarPlus className="size-4" />} />
+        <ActionButton
+          label="יומן"
+          icon={<CalendarPlus className="size-4" />}
+          onClick={() => downloadIcs([match], `bezeq-tennis-match-${match.id}.ics`)}
+        />
       </div>
     </li>
   );

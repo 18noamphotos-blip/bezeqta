@@ -5,7 +5,7 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import api from './index.mjs';
-const ORIGIN = 'https://18noamphotos-blip.github.io';
+import { ORIGIN } from './validate.mjs';
 const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 function binding(db) {
  return { prepare(sql) { return { sql, params: [], bind(...params) { return {sql, params}; } }; }, async batch(statements) {
