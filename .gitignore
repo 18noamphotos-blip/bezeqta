@@ -1,11 +1,11 @@
-node_modules/
-.project_id
-.github_repo
-.env
-.env.*
 
 # Local static Pages output
-dist/
-
+.env
+.env.*
+.github_repo
+.project_id
 .wrangler/
+dist/
+node_modules/
 worker/generated/
+worker/site

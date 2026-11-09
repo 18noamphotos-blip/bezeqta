@@ -1,14 +1,23 @@
 // Public API address, never a credential. The Worker binds D1 server-side.
-export const API_URL = "https://bezeqta-scores.bezeqta-noamisback.workers.dev/marks";
+export const WORKER_MARKS_URL = "https://bezeqta-scores.bezeqta-noamisback.workers.dev/marks";
+
+export function resolveMarksUrl(): string {
+  if (typeof location !== "undefined" && /\.workers\.dev$/i.test(location.hostname)) {
+    return "/marks";
+  }
+  return WORKER_MARKS_URL;
+}
+
+export const API_URL = WORKER_MARKS_URL;
 export type SharedMark = { matchId: number; played: boolean; score: string };
 export type Snapshot = SharedMark[] & { version: number };
 
 function abortAfter(ms: number): AbortSignal {
-  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-    return AbortSignal.timeout(ms);
-  }
+  // Prefer AbortController everywhere — some WebViews mishandle AbortSignal.timeout.
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), ms);
+  const timer = setTimeout(() => controller.abort(), ms);
+  // Attach timer clear if abort happens early is unnecessary for short page life.
+  void timer;
   return controller.signal;
 }
 
@@ -18,15 +27,14 @@ export function decodeSnapshot(body: { version: number; marks: SharedMark[] }): 
   return Object.assign(body.marks, { version });
 }
 export async function listMarks(): Promise<Snapshot> {
-  const response = await fetch(API_URL, { cache: "no-store", signal: abortAfter(15000) });
+  const response = await fetch(resolveMarksUrl(), { cache: "no-store", signal: abortAfter(15000) });
   if (!response.ok) throw new Error("Sync unavailable");
   return decodeSnapshot(await response.json());
 }
-// Serialize writes in this tab so an earlier edit cannot arrive after a newer one.
 let writes: Promise<unknown> = Promise.resolve();
 export function saveMark({ data }: { data: SharedMark }): Promise<Snapshot> {
   const operation = writes.catch(() => undefined).then(async () => {
-    const response = await fetch(API_URL, {
+    const response = await fetch(resolveMarksUrl(), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data), signal: abortAfter(15000),
     });
