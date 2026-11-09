@@ -1,0 +1,12 @@
+{
+  "name": "bezeqta-scores-api",
+  "compatibility_date": "2026-11-08",
+  "pages_build_output_dir": "./pages-static",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bezeqta-scores",
+      "database_id": "a99dc9c2-2cd3-4abb-9600-76f60de1375f"
+    }
+  ]
+}
