@@ -33,13 +33,14 @@ export default {
         text += decoder.decode();
       }
       try { data = JSON.parse(text); } catch { return json({ error: 'Invalid JSON' }, 400); }
-      if (!validMark(data)) return json({ error: 'Invalid match edit' }, 400);
+      if (!validMark(data)) { console.log(JSON.stringify({ event: 'invalid_mark' })); return json({ error: 'Invalid match edit' }, 400); }
     }
     try {
       const statements = [];
       if (data) {
         statements.push(env.DB.prepare('UPDATE match_marks SET played = ?, score = ?, updated_at = CURRENT_TIMESTAMP WHERE match_id = ?').bind(data.played ? 1 : 0, data.score.trim(), data.matchId));
         statements.push(env.DB.prepare('UPDATE board_revision SET version = version + 1 WHERE id = 1'));
+        console.log(JSON.stringify({ event: 'mark_saved', matchId: data.matchId }));
       }
       statements.push(env.DB.prepare(select), env.DB.prepare(revision));
       return json(snapshot(await env.DB.batch(statements)));

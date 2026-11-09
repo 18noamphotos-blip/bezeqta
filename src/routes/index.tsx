@@ -33,6 +33,15 @@ import { listMarks, saveMark, type SharedMark } from "@/lib/marks.functions";
 
 import { mergeSharedSnapshot } from "@/lib/shared-marks";
 import { buildMarkPayload } from "@/lib/mark-payload";
+import {
+  clearOutboxMark,
+  entriesWithOutbox,
+  loadOutbox,
+  outboxIds,
+  reconcileOutbox,
+  upsertOutbox,
+  type Outbox,
+} from "@/lib/pending-marks";
 import { ALLOWED_SCORES, allowedScore, outcomeFromScore, scoreForOutcome, scoreSelection, type Outcome } from "@/lib/score-selection";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -42,7 +51,8 @@ const STORAGE_KEY = "bezeq_tennis_shared_v1";
 type Filter = "all" | "open" | "played";
 
 function Home() {
-  const [entries, setEntries] = useState<Entries>({});
+  const bootOutbox = loadOutbox();
+  const [entries, setEntries] = useState<Entries>(() => entriesWithOutbox({}, bootOutbox));
   const [home, setHome] = useState<VenueId | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [now, setNow] = useState<Date | null>(null);
@@ -52,6 +62,7 @@ function Home() {
   const tries = useRef(new Map<number, number>());
   const seq = useRef(0);
   const remoteVersion = useRef(-1);
+  const outboxRef = useRef<Outbox>(bootOutbox);
 
   function remember(next: Entries) {
     entriesRef.current = next;
@@ -59,21 +70,29 @@ function Home() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }
 
+  function pendingKeys() {
+    return new Set<number>([...inflight.current.keys(), ...outboxIds(outboxRef.current)]);
+  }
+
   function applyRemote(rows: SharedMark[]) {
-    const merged = mergeSharedSnapshot(rows, remoteVersion.current, entriesRef.current, inflight.current.keys());
+    // Keep durable outbox on top of the server board so a blank GET cannot erase unsynced edits.
+    const local = entriesWithOutbox(entriesRef.current, outboxRef.current);
+    const merged = mergeSharedSnapshot(rows, remoteVersion.current, local, pendingKeys());
     if (!merged) return;
     remoteVersion.current = merged.version;
-    remember(merged.entries);
+    outboxRef.current = reconcileOutbox(outboxRef.current, Array.from(rows));
+    remember(entriesWithOutbox(merged.entries, outboxRef.current));
   }
 
   function push(id: number, entry: { played?: boolean; score?: string }) {
     const ticket = ++seq.current;
     inflight.current.set(id, ticket);
     const payload = buildMarkPayload(id, entry);
+    outboxRef.current = upsertOutbox(outboxRef.current, id, payload);
     void saveMark({ data: payload })
       .then((rows) => {
         if (inflight.current.get(id) !== ticket) return;
-        const latest = entriesRef.current[id];
+        const latest = outboxRef.current[String(id)] ?? entriesRef.current[id];
         const same =
           Boolean(latest?.played) === payload.played &&
           (latest?.score ?? "").trim().slice(0, 8) === payload.score;
@@ -81,11 +100,15 @@ function Home() {
         tries.current.delete(id);
         if (!same) {
           // A newer local edit won the race; queue that instead of stalling on -1.
-          window.setTimeout(() => push(id, entriesRef.current[id] ?? entry), 0);
+          window.setTimeout(() => {
+            const newer = outboxRef.current[String(id)] ?? entriesRef.current[id] ?? entry;
+            push(id, newer);
+          }, 0);
           return;
         }
+        outboxRef.current = clearOutboxMark(outboxRef.current, id);
         applyRemote(rows);
-        if (inflight.current.size === 0) setSyncError(false);
+        if (inflight.current.size === 0 && outboxIds(outboxRef.current).length === 0) setSyncError(false);
       })
       .catch(() => {
         if (inflight.current.get(id) !== ticket) return;
@@ -95,7 +118,8 @@ function Home() {
         if (attempt < 3) {
           window.setTimeout(() => {
             if (inflight.current.get(id) !== ticket) return;
-            push(id, entriesRef.current[id] ?? entry);
+            const latest = outboxRef.current[String(id)] ?? entriesRef.current[id] ?? entry;
+            push(id, latest);
           }, 2000);
         }
       });
@@ -113,14 +137,20 @@ function Home() {
         const rows = await listMarks();
         if (cancelled) return;
         applyRemote(rows);
-        // A successful poll after a prolonged outage retries only current edits.
+        // Re-send durable outbox and exhausted in-flight edits until the shared board matches.
+        const queued = new Set<number>(outboxIds(outboxRef.current));
         for (const [id, ticket] of inflight.current) {
           if (ticket > 0 && (tries.current.get(id) ?? 0) >= 3) {
             tries.current.delete(id);
-            push(id, entriesRef.current[id] ?? {});
+            queued.add(id);
           }
         }
-        if (inflight.current.size === 0) setSyncError(false);
+        for (const id of queued) {
+          if (inflight.current.has(id) && (inflight.current.get(id) ?? 0) > 0) continue;
+          const entry = outboxRef.current[String(id)] ?? entriesRef.current[id];
+          if (entry) push(id, entry);
+        }
+        if (inflight.current.size === 0 && outboxIds(outboxRef.current).length === 0) setSyncError(false);
       } catch {
         if (!cancelled) setSyncError(true);
       }

@@ -20,7 +20,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:pages": "vite build --config vite.pages.config.ts",
-    "test:pages": "node --test scripts/pages.test.mjs worker/api.test.mjs scripts/marks-api.test.mjs scripts/mark-payload.test.mjs"
+    "test:pages": "node --test scripts/pages.test.mjs worker/api.test.mjs scripts/marks-api.test.mjs scripts/mark-payload.test.mjs scripts/pending-marks.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
